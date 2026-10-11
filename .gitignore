@@ -1,0 +1,13 @@
+# Secrets: never commit API keys or passwords
+.env
+.env.*
+
+# Dependencies and build output (for later)
+node_modules/
+dist/
+build/
+
+# OS / editor clutter
+.DS_Store
+Thumbs.db
+.vscode/

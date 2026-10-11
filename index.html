@@ -1,0 +1,556 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>CarbonVista — ESG Report Writer (prototype)</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+  <style>
+    /* ===== Design tokens: change --accent to re-colour the whole app ===== */
+    :root {
+      --accent: #1D6B47;
+      --accent-soft: color-mix(in srgb, var(--accent) 11%, white);
+      --ink: #13231B;
+      --muted: #4D5C54;
+      --line: #DCE3DE;
+      --bg: #F3F5F2;
+      --sidebar: #12201A;
+      --mono: 'IBM Plex Mono', ui-monospace, monospace;
+    }
+    * { box-sizing: border-box; }
+    body { margin: 0; background: var(--bg); color: var(--ink); font-family: 'Instrument Sans', system-ui, sans-serif; }
+    button, input, select { font: inherit; }
+    input:focus, select:focus, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+    h1, h2, h3, p { margin: 0; }
+    .mono { font-family: var(--mono); }
+
+    /* ===== Layout ===== */
+    .layout { min-height: 100vh; display: flex; flex-wrap: wrap; }
+    .sidebar { flex: 1 1 240px; background: var(--sidebar); color: #DCE6E0; padding: 28px 18px; display: flex; flex-direction: column; gap: 32px; }
+    .main { flex: 999 1 560px; min-width: 0; padding: 32px clamp(16px, 4vw, 56px) 64px; }
+    .main-inner { max-width: 1080px; display: flex; flex-direction: column; gap: 28px; }
+    .stack { display: flex; flex-direction: column; gap: 18px; }
+    .row-wrap { display: flex; flex-wrap: wrap; align-items: center; gap: 14px; }
+    .auto-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; }
+
+    /* ===== Sidebar ===== */
+    .brand { display: flex; align-items: center; gap: 10px; padding: 0 8px; }
+    .brand-name { font-size: 18px; font-weight: 700; color: #fff; }
+    .brand-sub { font-size: 12px; color: #9DB0A5; }
+    .eyebrow-dark { font-size: 11px; letter-spacing: .08em; text-transform: uppercase; color: #8EA197; padding: 0 10px 8px; }
+    .nav-step { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 44px; padding: 8px 10px; border: 0; border-radius: 10px; font-size: 15px; text-align: left; cursor: pointer; background: transparent; color: #C3D1C8; font-weight: 500; }
+    .nav-step[aria-current] { background: #22352B; color: #fff; font-weight: 600; }
+    .num { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 999px; font-size: 13px; font-family: var(--mono); flex-shrink: 0; border: 1px solid #4A5E53; color: #9DB0A5; }
+    .num.current { background: #8FD3AE; color: #0E1A14; border: 0; font-weight: 600; }
+    .num.done { background: #2C4A3A; color: #BFE8CF; border: 0; }
+    .progress-dark { margin-top: auto; padding: 16px 10px 0; border-top: 1px solid #2A3D33; display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: #C3D1C8; }
+    .bar { height: 6px; background: #2A3D33; border-radius: 999px; overflow: hidden; }
+    .bar > div { height: 100%; background: #8FD3AE; border-radius: 999px; transition: width .3s; }
+    .bar.light { height: 8px; background: #DDE4DF; flex: 1 1 200px; }
+    .bar.light > div { background: var(--accent); }
+
+    /* ===== Header ===== */
+    .header { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: flex-start; gap: 16px; }
+    .step-label { font-size: 13px; font-weight: 600; color: var(--accent); font-family: var(--mono); }
+    h1 { font-size: clamp(28px, 3.2vw, 38px); line-height: 1.1; letter-spacing: -.02em; margin: 8px 0; }
+    .intro { font-size: 16px; line-height: 1.5; color: var(--muted); max-width: 640px; }
+    .badge { display: inline-flex; align-items: center; gap: 8px; padding: 8px 12px; border-radius: 999px; background: #E6ECE7; color: #33433A; font-size: 13px; font-weight: 500; }
+
+    /* ===== Common pieces ===== */
+    .card { background: #fff; border: 1px solid var(--line); border-radius: 14px; }
+    .pad { padding: 28px; }
+    .field { display: flex; flex-direction: column; gap: 8px; font-size: 14px; font-weight: 600; color: #2B3A32; }
+    .input { height: 44px; border: 1px solid #C5CFC8; border-radius: 10px; padding: 0 12px; font-size: 15px; font-weight: 400; color: var(--ink); background: #fff; width: 100%; min-width: 0; }
+    .btn { min-height: 44px; padding: 0 18px; border-radius: 10px; font-size: 15px; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; }
+    .btn-primary { background: var(--accent); color: #fff; border: 0; font-weight: 600; }
+    .btn-secondary { background: #fff; color: var(--ink); border: 1px solid #C5CFC8; font-weight: 500; }
+    .btn-dark { background: var(--ink); color: #fff; border: 0; font-weight: 600; }
+    .note { padding: 16px 18px; border-radius: 12px; background: #E6ECE7; font-size: 14px; line-height: 1.55; color: #2B3A32; }
+    .pill { flex: 0 0 auto; padding: 4px 10px; border-radius: 999px; font-size: 12px; font-weight: 600; }
+    .pill-entered, .pill-drafted { background: var(--accent-soft); color: var(--accent); }
+    .pill-missing { background: #FBEFE2; color: #8A4510; }
+    .pill-accepted { background: var(--accent); color: #fff; }
+    .pill-working { background: #E7EEF6; color: #1F4E79; }
+    .pill-idle { background: #EEF2EF; color: var(--muted); }
+
+    /* ===== Frameworks ===== */
+    .fw-card { display: flex; flex-direction: column; gap: 12px; min-height: 190px; padding: 20px; text-align: left; border-radius: 14px; cursor: pointer; background: #fff; border: 2px solid var(--line); }
+    .fw-card.on { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
+    .fw-name { font-size: 17px; font-weight: 600; line-height: 1.3; color: var(--ink); }
+    .fw-desc { font-size: 14px; line-height: 1.5; color: var(--muted); }
+    .tag { align-self: flex-start; margin-top: auto; padding: 4px 10px; border-radius: 999px; background: #EEF2EF; color: #33433A; font-size: 12px; font-weight: 500; }
+    .checkbox { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; flex-shrink: 0; border-radius: 7px; border: 2px solid #AEBBB3; }
+    .checkbox.on { background: var(--accent); border-color: var(--accent); }
+
+    /* ===== Data ===== */
+    .dropzone { display: flex; flex-wrap: wrap; align-items: center; gap: 18px; padding: 22px 24px; border: 1.5px dashed #AEBBB3; border-radius: 14px; background: #FAFBFA; }
+    .group-head { display: flex; align-items: center; gap: 10px; padding: 14px 20px; background: #F6F8F6; border-bottom: 1px solid var(--line); border-radius: 14px 14px 0 0; }
+    .letter { display: inline-flex; align-items: center; justify-content: center; width: 26px; height: 26px; border-radius: 7px; background: var(--accent); color: #fff; font-size: 13px; font-weight: 700; font-family: var(--mono); }
+    .metric-row { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 20px; padding: 14px 20px; border-bottom: 1px solid #EDF1EE; }
+    .metric-row:last-child { border-bottom: 0; }
+    .metric-label { flex: 1 1 240px; display: flex; flex-direction: column; gap: 2px; }
+    .metric-label b { font-size: 15px; }
+    .metric-label small { font-size: 13px; color: #56655D; }
+    .metric-input { display: flex; align-items: center; gap: 8px; flex: 0 1 230px; }
+    .metric-input .input { font-family: var(--mono); height: 42px; }
+    .unit { font-size: 13px; color: var(--muted); min-width: 64px; }
+
+    /* ===== Draft ===== */
+    .segmented { display: inline-flex; flex-wrap: wrap; padding: 4px; gap: 4px; background: #E3E9E5; border-radius: 12px; }
+    .segmented button { min-height: 38px; padding: 0 14px; border: 0; border-radius: 9px; font-size: 14px; cursor: pointer; background: transparent; color: #3E4D45; font-weight: 500; }
+    .segmented button[aria-pressed="true"] { background: #fff; color: var(--ink); font-weight: 600; box-shadow: 0 1px 3px rgba(0,0,0,.12); }
+    .draft-layout { display: flex; flex-wrap: wrap; gap: 18px; align-items: flex-start; }
+    .section-list { flex: 1 1 210px; display: flex; flex-direction: column; gap: 4px; padding: 10px; }
+    .section-btn { display: flex; align-items: center; gap: 12px; width: 100%; min-height: 52px; padding: 8px 12px; border: 0; border-radius: 10px; text-align: left; cursor: pointer; font-size: 14px; color: var(--ink); background: transparent; font-weight: 500; }
+    .section-btn[aria-current] { background: #EEF2EF; font-weight: 600; }
+    .section-btn small { display: block; font-size: 12px; font-weight: 400; color: #56655D; }
+    .dot { width: 10px; height: 10px; border-radius: 999px; flex-shrink: 0; border: 2px solid #AEBBB3; }
+    .dot-drafted { border-color: var(--accent); }
+    .dot-accepted { background: var(--accent); border-color: var(--accent); }
+    .dot-working { background: #4A7FB5; border-color: #4A7FB5; }
+    .draft { flex: 999 1 420px; min-width: 0; display: flex; flex-direction: column; }
+    .draft-head { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding: 18px 24px; border-bottom: 1px solid #E6EBE7; }
+    .draft-head h2 { font-size: 20px; }
+    .draft-body { padding: 24px; display: flex; flex-direction: column; gap: 16px; min-height: 280px; }
+    .draft-foot { display: flex; flex-wrap: wrap; gap: 10px; padding: 16px 24px; border-top: 1px solid #E6EBE7; }
+    .draft-p { font-size: 16px; line-height: 1.75; color: #1C2B23; }
+    .seg-value { background: var(--accent-soft); color: var(--accent); font-weight: 600; padding: 1px 5px; border-radius: 4px; }
+    .seg-gap { background: #FBEFE2; color: #8A4510; border-bottom: 1.5px dashed #C9732E; padding: 1px 5px; font-weight: 600; }
+    .seg-guide { color: #56655D; font-style: italic; }
+    .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 13px; color: var(--muted); }
+    .skeleton { height: 14px; background: #E3E9E5; border-radius: 6px; animation: pulse 1.2s ease-in-out infinite; }
+    @keyframes pulse { 0%, 100% { opacity: .45 } 50% { opacity: 1 } }
+    .aside { flex: 1 1 220px; display: flex; flex-direction: column; gap: 14px; }
+    .aside .card { padding: 18px; display: flex; flex-direction: column; gap: 10px; }
+    .aside h3 { font-size: 15px; }
+    .gaps { margin: 0; padding-left: 18px; display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: #8A4510; }
+    .warn { background: #FBF4EA !important; border-color: #EBD6BC !important; color: #5E3410; font-size: 14px; line-height: 1.5; }
+
+    /* ===== Export ===== */
+    .stat { padding: 20px; display: flex; flex-direction: column; gap: 6px; }
+    .stat span { font-size: 13px; color: var(--muted); }
+    .stat strong { font-size: 30px; font-family: var(--mono); font-weight: 600; }
+    .check-row { display: flex; flex-wrap: wrap; justify-content: space-between; align-items: center; gap: 10px; padding: 14px 20px; border-bottom: 1px solid #EDF1EE; }
+    .check-row:last-child { border-bottom: 0; }
+
+    .footer-nav { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 12px; padding-top: 8px; border-top: 1px solid var(--line); }
+    .toast { position: fixed; left: 50%; bottom: 24px; transform: translateX(-50%); max-width: calc(100% - 32px); background: var(--ink); color: #fff; padding: 12px 18px; border-radius: 10px; font-size: 14px; box-shadow: 0 8px 24px rgba(0,0,0,.18); }
+  </style>
+</head>
+<body>
+  <div id="app"></div>
+
+  <script type="module">
+    // Preact + htm: a tiny React-like library loaded from a CDN, so there is no build step.
+    import { html, render, useState, useRef, useEffect } from 'https://unpkg.com/htm@3.1.1/preact/standalone.module.js';
+
+    // =====================================================================
+    // 1. CONTENT — edit these lists to change steps, frameworks and metrics
+    // =====================================================================
+    const STEPS = [
+      { id: 'profile',   label: 'Company profile', title: 'Tell us about the company',      intro: 'These details appear on the cover and in every section the AI drafts.' },
+      { id: 'framework', label: 'Frameworks',      title: 'Choose reporting frameworks',    intro: 'The AI structures the report and its disclosure index around what you pick.' },
+      { id: 'data',      label: 'ESG data',        title: 'Enter or import your ESG data',  intro: 'Every figure in the draft comes from here. Gaps are flagged, never guessed.' },
+      { id: 'draft',     label: 'AI draft',        title: 'Draft the report with AI',       intro: 'Generate each section, check it, then accept it once the figures are right.' },
+      { id: 'export',    label: 'Review & export', title: 'Review and export',              intro: 'See what is ready, then download the report for sign-off.' },
+    ];
+
+    const FRAMEWORKS = [
+      { id: 'hkex', name: 'HKEX ESG Reporting Code', desc: 'The ESG disclosure rules for companies listed on the Hong Kong stock exchange.', tag: 'Hong Kong listed' },
+      { id: 'gri',  name: 'GRI Standards',           desc: 'Widely used global standards for reporting impacts on the economy, environment and people.', tag: 'Global · impact' },
+      { id: 'issb', name: 'ISSB (IFRS S1 & S2)',     desc: 'Investor-focused sustainability and climate-related financial disclosures.', tag: 'Global · investors' },
+      { id: 'sasb', name: 'SASB Standards',          desc: 'Industry-specific metrics on the sustainability issues most material to each sector.', tag: 'Industry metrics' },
+    ];
+
+    // suf = how the value is written in the draft text (e.g. "12" + " tCO₂e")
+    const METRICS = [
+      { id: 's1',       cat: 'E', label: 'Scope 1 GHG emissions',            hint: 'Direct emissions from sources you own',          unit: 'tCO₂e',  suf: ' tCO₂e' },
+      { id: 's2',       cat: 'E', label: 'Scope 2 GHG emissions',            hint: 'Indirect emissions from purchased electricity',  unit: 'tCO₂e',  suf: ' tCO₂e' },
+      { id: 'energy',   cat: 'E', label: 'Total energy consumption',         hint: 'Electricity, fuel and other energy',             unit: 'MWh',    suf: ' MWh' },
+      { id: 'water',    cat: 'E', label: 'Water consumption',                hint: 'Total water used in the year',                   unit: 'm³',     suf: ' m³' },
+      { id: 'haz',      cat: 'E', label: 'Hazardous waste',                  hint: 'Total hazardous waste produced',                 unit: 'tonnes', suf: ' tonnes' },
+      { id: 'emp',      cat: 'S', label: 'Total employees',                  hint: 'Headcount at year end',                          unit: 'people', suf: ' employees' },
+      { id: 'women',    cat: 'S', label: 'Women in workforce',               hint: 'Share of total headcount',                       unit: '%',      suf: '%' },
+      { id: 'turnover', cat: 'S', label: 'Employee turnover rate',           hint: 'Leavers as a share of average headcount',        unit: '%',      suf: '%' },
+      { id: 'training', cat: 'S', label: 'Average training hours',           hint: 'Per employee, for the year',                     unit: 'hours',  suf: ' hours' },
+      { id: 'lti',      cat: 'S', label: 'Lost-time injuries',               hint: 'Work injuries that caused lost days',            unit: 'cases',  suf: '' },
+      { id: 'indep',    cat: 'G', label: 'Independent board members',        hint: 'Share of board seats',                           unit: '%',      suf: '%' },
+      { id: 'ac',       cat: 'G', label: 'Anti-corruption training coverage', hint: 'Share of employees trained',                    unit: '%',      suf: '%' },
+    ];
+    const METRIC = Object.fromEntries(METRICS.map(m => [m.id, m]));
+    const GROUPS = [{ cat: 'E', name: 'Environmental' }, { cat: 'S', name: 'Social' }, { cat: 'G', name: 'Governance' }];
+
+    const SECTIONS = [
+      { id: 'scope',      title: 'Reporting scope & boundary', metrics: [] },
+      { id: 'climate',    title: 'Climate & emissions',        metrics: ['s1', 's2'] },
+      { id: 'resources',  title: 'Resource use',               metrics: ['energy', 'water', 'haz'] },
+      { id: 'people',     title: 'Our people',                 metrics: ['emp', 'women', 'turnover', 'training'] },
+      { id: 'safety',     title: 'Health & safety',            metrics: ['lti'] },
+      { id: 'governance', title: 'Governance & ethics',        metrics: ['indep', 'ac'] },
+    ];
+
+    const TONES = [{ id: 'concise', label: 'Concise' }, { id: 'balanced', label: 'Balanced' }, { id: 'investor', label: 'Investor-focused' }];
+
+    // =====================================================================
+    // 2. FAKE AI — builds draft text from the user's data.
+    //    Later, this is the part replaced by a real AI call on a server.
+    // =====================================================================
+    function buildDraft(s, selectedFrameworks) {
+      const val = id => {
+        const v = (s.values[id] || '').trim();
+        return v ? { t: v + METRIC[id].suf, k: 'value' } : { t: '[' + METRIC[id].label + ']', k: 'gap' };
+      };
+      const co = () => s.company.trim() ? { t: s.company.trim(), k: 'value' } : { t: '[Company name]', k: 'gap' };
+      const yr = () => s.year.trim() ? { t: s.year.trim(), k: 'value' } : { t: '[Reporting year]', k: 'gap' };
+      const fw = () => selectedFrameworks.length ? { t: selectedFrameworks.map(f => f.name).join(', '), k: 'value' } : { t: '[Framework]', k: 'gap' };
+      // Plain strings are normal text; strings starting with "[" are prompts for the writer.
+      const P = (...parts) => parts.map(p => typeof p === 'string' ? { t: p, k: p.startsWith('[') ? 'guide' : 'plain' } : p);
+
+      return {
+        scope: [
+          P(co(), ' presents its Environmental, Social and Governance (ESG) report for the financial year ', yr(), '. This report has been prepared with reference to ', fw(), '. ', '[Describe the operations, subsidiaries and locations this report covers.]'),
+          P('The Board has overall responsibility for the Group’s ESG strategy and reporting. ', '[Explain how material topics were identified, e.g. through stakeholder engagement and a materiality assessment.]'),
+        ],
+        climate: [
+          P('In ', yr(), ', ', co(), ' recorded Scope 1 greenhouse gas emissions of ', val('s1'), ' and Scope 2 emissions of ', val('s2'), '. ', '[Explain the main emission sources and any change from the prior year.]'),
+          P('Emissions are calculated using ', '[methodology, e.g. the GHG Protocol]', ' and ', '[emission factor sources]', '. ', '[State any reduction targets and progress made.]'),
+        ],
+        resources: [
+          P('Total energy consumption for the year was ', val('energy'), ', and water consumption was ', val('water'), '. Hazardous waste produced totalled ', val('haz'), '.'),
+          P('[Describe energy-efficiency measures, water management and how waste is handled.]'),
+        ],
+        people: [
+          P('At year end the Group had ', val('emp'), ', with women making up ', val('women'), ' of the workforce. Employee turnover for the year was ', val('turnover'), '.'),
+          P('Employees received an average of ', val('training'), ' of training. ', '[Describe hiring, development and wellbeing programmes.]'),
+        ],
+        safety: [
+          P('The number of lost-time injuries recorded during the year was ', val('lti'), '. ', '[Describe the safety management system, training and how incidents are investigated.]'),
+        ],
+        governance: [
+          P('Independent directors make up ', val('indep'), ' of the Board, and ', val('ac'), ' of employees completed anti-corruption training during the year. ', '[Describe whistleblowing channels and ethics policies.]'),
+        ],
+      };
+    }
+
+    // =====================================================================
+    // 3. SMALL ICONS
+    // =====================================================================
+    const IconCheck = (size = 14, color = 'currentColor') => html`<svg width=${size} height=${size} viewBox="0 0 24 24" fill="none" stroke=${color} stroke-width="2.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12.5l4.5 4.5L19 7" /></svg>`;
+    const IconLeaf = html`<svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#8FD3AE" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 19c0-8 5-13 14-14 0 9-5 14-13 14" /><path d="M5 19l7-7" /></svg>`;
+    const IconInfo = html`<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" /><path d="M12 8v5M12 16.5v.01" /></svg>`;
+    const IconArrow = html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6" /></svg>`;
+    const IconSpark = html`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" /></svg>`;
+    const IconUpload = html`<svg width="34" height="34" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 15V4M7.5 8.5L12 4l4.5 4.5" /><path d="M4 15v3a2 2 0 002 2h12a2 2 0 002-2v-3" /></svg>`;
+
+    // =====================================================================
+    // 4. THE APP
+    // =====================================================================
+    const INITIAL_STATE = {
+      step: 'profile', company: '', year: '2026', industry: '',
+      frameworks: { hkex: true }, values: {}, section: 'scope',
+      working: {}, generated: {}, accepted: {}, tone: 'balanced', toast: '',
+    };
+
+    function App() {
+      const [s, setS] = useState(INITIAL_STATE);
+      const update = fn => setS(prev => ({ ...prev, ...fn(prev) }));
+
+      // timers for the fake "AI is thinking" delay and the toast message
+      const timers = useRef([]);
+      useEffect(() => () => timers.current.forEach(clearTimeout), []);
+      const later = (fn, ms) => timers.current.push(setTimeout(fn, ms));
+      const notWired = () => {
+        update(() => ({ toast: 'Not connected yet: this button gets wired up in the real build.' }));
+        later(() => update(() => ({ toast: '' })), 2800);
+      };
+      const generate = ids => {
+        if (!ids.length) return;
+        update(p => ({ working: { ...p.working, ...Object.fromEntries(ids.map(id => [id, true])) } }));
+        later(() => update(p => {
+          const working = { ...p.working }, generated = { ...p.generated };
+          ids.forEach(id => { delete working[id]; generated[id] = true; });
+          return { working, generated };
+        }), 1600);
+      };
+
+      // ----- derived values -----
+      const filled = id => (s.values[id] || '').trim() !== '';
+      const filledCount = METRICS.filter(m => filled(m.id)).length;
+      const pct = Math.round(filledCount / METRICS.length * 100);
+      const selectedFw = FRAMEWORKS.filter(f => s.frameworks[f.id]);
+      const acceptedCount = SECTIONS.filter(x => s.accepted[x.id]).length;
+      const stepIdx = STEPS.findIndex(x => x.id === s.step);
+      const step = STEPS[stepIdx];
+      const next = STEPS[stepIdx + 1];
+      const prev = STEPS[stepIdx - 1];
+      const isDone = {
+        profile: s.company.trim() !== '',
+        framework: selectedFw.length > 0,
+        data: filledCount === METRICS.length,
+        draft: acceptedCount === SECTIONS.length,
+        export: false,
+      };
+      const statusOf = id => s.accepted[id] ? 'Accepted' : s.working[id] ? 'Drafting…' : s.generated[id] ? 'Drafted' : 'Not started';
+      const statusKey = st => ({ 'Accepted': 'accepted', 'Drafting…': 'working', 'Drafted': 'drafted', 'Not started': 'idle' })[st];
+      const go = id => () => update(() => ({ step: id }));
+
+      const ctx = { s, update, filled, filledCount, pct, selectedFw, acceptedCount, statusOf, statusKey, generate, notWired, go };
+
+      return html`
+        <div class="layout">
+          <nav class="sidebar" aria-label="Report steps">
+            <div class="brand">
+              ${IconLeaf}
+              <div><div class="brand-name">CarbonVista</div><div class="brand-sub">ESG report writer</div></div>
+            </div>
+            <div class="stack" style="gap:4px">
+              <span class="eyebrow-dark">Report · FY${s.year.trim() || '—'}</span>
+              ${STEPS.map((st, i) => {
+                const current = i === stepIdx;
+                const done = isDone[st.id] && !current;
+                return html`
+                  <button type="button" class="nav-step" aria-current=${current ? 'step' : undefined} onClick=${go(st.id)}>
+                    <span class=${'num' + (current ? ' current' : done ? ' done' : '')}>${done ? IconCheck() : i + 1}</span>
+                    <span>${st.label}</span>
+                  </button>`;
+              })}
+            </div>
+            <div class="progress-dark">
+              <span>Data completeness</span>
+              <div class="bar"><div style=${'width:' + pct + '%'}></div></div>
+              <span class="mono" style="font-size:12px;color:#9DB0A5">${filledCount} / ${METRICS.length} metrics</span>
+            </div>
+          </nav>
+
+          <main class="main">
+            <div class="main-inner">
+              <header class="header">
+                <div>
+                  <span class="step-label">Step ${stepIdx + 1} of ${STEPS.length}</span>
+                  <h1>${step.title}</h1>
+                  <p class="intro">${step.intro}</p>
+                </div>
+                <span class="badge">${IconInfo} Prototype · AI output is simulated</span>
+              </header>
+
+              ${s.step === 'profile' && ProfileStep(ctx)}
+              ${s.step === 'framework' && FrameworkStep(ctx)}
+              ${s.step === 'data' && DataStep(ctx)}
+              ${s.step === 'draft' && DraftStep(ctx)}
+              ${s.step === 'export' && ExportStep(ctx)}
+
+              <div class="footer-nav">
+                <div>${prev && html`<button type="button" class="btn btn-secondary" onClick=${go(prev.id)}>Back</button>`}</div>
+                ${next && html`<button type="button" class="btn btn-dark" onClick=${go(next.id)}>Continue to ${next.label.toLowerCase()} ${IconArrow}</button>`}
+              </div>
+            </div>
+          </main>
+
+          ${s.toast && html`<div class="toast" role="status">${s.toast}</div>`}
+        </div>`;
+    }
+
+    // ----- Step 1 -----
+    function ProfileStep({ s, update, notWired }) {
+      const setField = key => e => { const v = e.target.value; update(() => ({ [key]: v })); };
+      return html`
+        <section class="card pad auto-grid" aria-label="Company profile">
+          <label class="field">Company name
+            <input class="input" type="text" placeholder="e.g. Harbour Holdings Ltd" value=${s.company} onInput=${setField('company')} />
+          </label>
+          <label class="field">Reporting year
+            <input class="input" type="text" inputmode="numeric" value=${s.year} onInput=${setField('year')} />
+          </label>
+          <label class="field">Industry
+            <select class="input" value=${s.industry} onChange=${setField('industry')}>
+              <option value="">Select an industry</option>
+              ${['Financial services', 'Property & construction', 'Manufacturing', 'Retail & consumer', 'Technology', 'Transport & logistics', 'Utilities & energy', 'Other'].map(o => html`<option>${o}</option>`)}
+            </select>
+          </label>
+          <label class="field">Listing
+            <select class="input">
+              <option>Listed in Hong Kong (HKEX)</option><option>Listed elsewhere</option><option>Not listed</option>
+            </select>
+          </label>
+          <label class="field">Headquarters
+            <input class="input" type="text" placeholder="e.g. Hong Kong" />
+          </label>
+          <label class="field">ESG contact email
+            <input class="input" type="email" placeholder="name@company.com" />
+          </label>
+        </section>`;
+    }
+
+    // ----- Step 2 -----
+    function FrameworkStep({ s, update }) {
+      const toggle = id => () => update(p => ({ frameworks: { ...p.frameworks, [id]: !p.frameworks[id] } }));
+      return html`
+        <div class="stack">
+          <div class="auto-grid">
+            ${FRAMEWORKS.map(f => {
+              const on = !!s.frameworks[f.id];
+              return html`
+                <button type="button" class=${'fw-card' + (on ? ' on' : '')} aria-pressed=${on ? 'true' : 'false'} onClick=${toggle(f.id)}>
+                  <span style="display:flex;justify-content:space-between;gap:12px">
+                    <span class="fw-name">${f.name}</span>
+                    <span class=${'checkbox' + (on ? ' on' : '')}>${on && IconCheck(14, '#fff')}</span>
+                  </span>
+                  <span class="fw-desc">${f.desc}</span>
+                  <span class="tag">${f.tag}</span>
+                </button>`;
+            })}
+          </div>
+          <p class="note">Not sure where to start? Hong Kong-listed companies usually begin with the HKEX code, then map to GRI or ISSB if investors ask for it.</p>
+        </div>`;
+    }
+
+    // ----- Step 3 -----
+    function DataStep({ s, update, filled, filledCount, pct, notWired }) {
+      const setValue = id => e => { const v = e.target.value; update(p => ({ values: { ...p.values, [id]: v } })); };
+      return html`
+        <div class="stack">
+          <div class="dropzone">
+            ${IconUpload}
+            <div style="flex:1 1 280px">
+              <div style="font-size:16px;font-weight:600">Import from a spreadsheet</div>
+              <div class="fw-desc">Drop an .xlsx or .csv file, or last year's report. In the full app, the AI matches your columns to the metrics below.</div>
+            </div>
+            <button type="button" class="btn btn-secondary" onClick=${notWired}>Browse files</button>
+          </div>
+
+          <div class="row-wrap">
+            <strong style="font-size:14px">${filledCount} of ${METRICS.length} metrics entered</strong>
+            <div class="bar light"><div style=${'width:' + pct + '%'}></div></div>
+          </div>
+
+          ${GROUPS.map(g => html`
+            <section class="card" aria-label=${g.name}>
+              <div class="group-head"><span class="letter">${g.cat}</span><h2 style="font-size:16px">${g.name}</h2></div>
+              ${METRICS.filter(m => m.cat === g.cat).map(m => html`
+                <div class="metric-row">
+                  <label class="metric-label" for=${'metric-' + m.id}><b>${m.label}</b><small>${m.hint}</small></label>
+                  <div class="metric-input">
+                    <input class="input" id=${'metric-' + m.id} type="text" inputmode="decimal" placeholder="Enter value" value=${s.values[m.id] || ''} onInput=${setValue(m.id)} />
+                    <span class="unit">${m.unit}</span>
+                  </div>
+                  <span class=${'pill ' + (filled(m.id) ? 'pill-entered' : 'pill-missing')}>${filled(m.id) ? 'Entered' : 'Missing'}</span>
+                </div>`)}
+            </section>`)}
+        </div>`;
+    }
+
+    // ----- Step 4 -----
+    function DraftStep({ s, update, filled, selectedFw, statusOf, statusKey, generate, notWired, go }) {
+      const sec = SECTIONS.find(x => x.id === s.section);
+      const status = statusOf(sec.id);
+      const working = !!s.working[sec.id];
+      const done = !!s.generated[sec.id] && !working;
+      const paragraphs = buildDraft(s, selectedFw)[sec.id];
+      const gaps = sec.metrics.filter(id => !filled(id)).map(id => METRIC[id].label);
+      if (sec.id === 'scope') {
+        if (!s.company.trim()) gaps.push('Company name (step 1)');
+        if (!selectedFw.length) gaps.push('Reporting framework (step 2)');
+      }
+      const toggleAccept = () => update(p => ({ accepted: { ...p.accepted, [sec.id]: !p.accepted[sec.id] } }));
+      const draftAll = () => generate(SECTIONS.map(x => x.id).filter(id => !s.generated[id] && !s.working[id]));
+
+      return html`
+        <div class="stack">
+          <div class="row-wrap" style="justify-content:space-between">
+            <div class="segmented" role="group" aria-label="Writing tone">
+              ${TONES.map(t => html`<button type="button" aria-pressed=${s.tone === t.id ? 'true' : 'false'} onClick=${() => update(() => ({ tone: t.id }))}>${t.label}</button>`)}
+            </div>
+            <button type="button" class="btn btn-primary" onClick=${draftAll}>${IconSpark} Draft all sections</button>
+          </div>
+
+          <div class="draft-layout">
+            <nav class="card section-list" aria-label="Report sections">
+              ${SECTIONS.map(x => {
+                const st = statusOf(x.id);
+                return html`
+                  <button type="button" class="section-btn" aria-current=${x.id === s.section ? 'true' : undefined} onClick=${() => update(() => ({ section: x.id }))}>
+                    <span class=${'dot dot-' + statusKey(st)}></span>
+                    <span>${x.title}<small>${st}</small></span>
+                  </button>`;
+              })}
+            </nav>
+
+            <article class="card draft">
+              <div class="draft-head">
+                <h2>${sec.title}</h2>
+                <span class=${'pill pill-' + statusKey(status)}>${status}</span>
+              </div>
+              <div class="draft-body">
+                ${!done && !working && html`
+                  <div class="stack" style="align-items:flex-start;padding:24px 0">
+                    <p class="intro" style="max-width:460px">Nothing drafted yet. The AI will write this section from your company profile, frameworks and the figures you entered.</p>
+                    <button type="button" class="btn btn-primary" onClick=${() => generate([sec.id])}>Generate this section</button>
+                  </div>`}
+                ${working && html`
+                  <div class="stack" aria-live="polite" style="gap:12px">
+                    <span class="fw-desc">Drafting from your data…</span>
+                    <div class="skeleton" style="width:92%"></div>
+                    <div class="skeleton" style="width:84%"></div>
+                    <div class="skeleton" style="width:70%"></div>
+                  </div>`}
+                ${done && html`
+                  ${paragraphs.map(p => html`<p class="draft-p">${p.map(seg => html`<span class=${'seg-' + seg.k}>${seg.t}</span>`)}</p>`)}
+                  <div class="legend">
+                    <span><span class="seg-value">12.3</span> from your data</span>
+                    <span><span class="seg-gap">[ ]</span> missing data</span>
+                    <span><span class="seg-guide">[ ]</span> for you to write</span>
+                  </div>`}
+              </div>
+              ${done && html`
+                <div class="draft-foot">
+                  <button type="button" class="btn btn-primary" onClick=${toggleAccept}>${s.accepted[sec.id] ? 'Undo accept' : 'Accept section'}</button>
+                  <button type="button" class="btn btn-secondary" onClick=${() => generate([sec.id])}>Regenerate</button>
+                  <button type="button" class="btn btn-secondary" onClick=${notWired}>Edit text</button>
+                </div>`}
+            </article>
+
+            <aside class="aside" aria-label="Checks for this section">
+              <div class="card">
+                <h3>Data gaps</h3>
+                ${gaps.length
+                  ? html`<ul class="gaps">${gaps.map(g => html`<li>${g}</li>`)}</ul>
+                         <button type="button" class="btn btn-secondary" style="align-self:flex-start;min-height:40px" onClick=${go('data')}>Fill in data</button>`
+                  : html`<p style="font-size:14px">Every figure this section needs is entered.</p>`}
+              </div>
+              <div class="card warn">
+                <h3>Human check required</h3>
+                <p>AI drafts can contain mistakes. Check every figure against source records before the report is signed off.</p>
+              </div>
+            </aside>
+          </div>
+        </div>`;
+    }
+
+    // ----- Step 5 -----
+    function ExportStep({ filledCount, selectedFw, acceptedCount, statusOf, statusKey, notWired }) {
+      return html`
+        <div class="stack">
+          <div class="auto-grid">
+            <div class="card stat"><span>Sections accepted</span><strong>${acceptedCount}/${SECTIONS.length}</strong></div>
+            <div class="card stat"><span>Metrics entered</span><strong>${filledCount}/${METRICS.length}</strong></div>
+            <div class="card stat"><span>Frameworks</span><b style="font-size:16px;line-height:1.4">${selectedFw.length ? selectedFw.map(f => f.name).join(', ') : 'None selected yet'}</b></div>
+          </div>
+          <section class="card" aria-label="Section checklist">
+            ${SECTIONS.map(x => {
+              const st = statusOf(x.id);
+              return html`<div class="check-row"><span style="font-size:15px;font-weight:500">${x.title}</span><span class=${'pill pill-' + statusKey(st)}>${st}</span></div>`;
+            })}
+          </section>
+          <div class="row-wrap" style="gap:10px">
+            <button type="button" class="btn btn-primary" onClick=${notWired}>Download Word (.docx)</button>
+            <button type="button" class="btn btn-secondary" onClick=${notWired}>Download PDF</button>
+            <button type="button" class="btn btn-secondary" onClick=${notWired}>Export disclosure index</button>
+          </div>
+        </div>`;
+    }
+
+    render(html`<${App} />`, document.getElementById('app'));
+  </script>
+</body>
+</html>
